@@ -1,12 +1,37 @@
 const express = require("express");
 const router = express.Router();
+const redis = require("redis");
 
 const Todo = require("../models/todo");
+
+const redisClient = redis.createClient({
+  host: process.env.REDIS_HOST || "redis",
+  port: process.env.REDIS_PORT || 6379,
+});
+
+redisClient.on("error", (err) => {
+  console.error("Redis error:", err);
+});
 
 // GET all todos
 router.get("/", async (req, res) => {
   const todos = await Todo.find({ is_complete: false });
-  res.send(todos);
+
+  const counterKey = "todos_access_count"; // Chave para o contador
+
+  // Incrementa o contador no Redis
+  redisClient.incr(counterKey, (err, newCount) => {
+    if (err) {
+      console.error("Redis INCR error:", err);
+      res.status(500).send("Server error");
+      return;
+    }
+    
+    // Aqui você pode retornar o contador ou outros dados
+    res.json({ 
+      data: todos,
+      message: `This route has been accessed ${newCount} times` });
+    });
 });
 
 // GET todo based on ID
