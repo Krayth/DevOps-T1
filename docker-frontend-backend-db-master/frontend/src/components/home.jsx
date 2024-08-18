@@ -18,6 +18,9 @@ const API_URL = process.env.REACT_APP_API_URL;
 const Home = () => {
   const [todos, setTodos] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const api = axios.create({
+    baseURL: API_URL
+  });
   useEffect(() => {
     const getData = async () => {
       getTodos();
@@ -27,7 +30,7 @@ const Home = () => {
 
   const getTodos = async () => {
     try {
-      const res = await axios.get(`${API_URL}/todos`);
+      const res = await api.get(`/todos`);
       setTodos(res.data);
     } catch (err) {
       console.log(err);
@@ -36,7 +39,7 @@ const Home = () => {
 
   const handleClick = async (id) => {
     try {
-      await axios.patch(`${API_URL}/todos/${id}`, {
+      await api.patch(`/todos/${id}`, {
         is_complete: true,
       });
       await getTodos();
@@ -47,7 +50,7 @@ const Home = () => {
 
   const handleNewTodo = async (todo) => {
     try {
-      await axios.post(`${API_URL}/todos`, todo);
+      await api.post(`/todos`, todo);
       await getTodos();
       setModalOpen(false);
     } catch (err) {

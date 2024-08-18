@@ -1,35 +1,37 @@
 version: "3.8"
 services:
-  nagios-json:
-    build: ./nagios-json
-    ports:
-    - "2000:80"
-  swagger-ui:
-    image: swaggerapi/swagger-ui
-    container_name: "swagger-ui-container"
-    ports:
-      - "8082:8080"
-    volumes:
-      - ./swagger.json:/swagger/swagger.json
-    environment:
-      SWAGGER_JSON: /swagger/swagger.json
   web:
     build: ./frontend
     depends_on:
       - api
-    ports:
-      - "3000:3000"
     networks:
       - network-backend
   api:
     build: ./backend
     depends_on:
       - mongo
-    ports:
-      - "3001:3001"
     networks: 
      - network-backend
-  
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"  # Mapeia a porta 6379 do contêiner para a porta 6379 do host
+    networks: 
+     - network-backend
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+      - api
+    networks:
+      - network-backend
+
   mongo:
     image: mongo
     restart: always
