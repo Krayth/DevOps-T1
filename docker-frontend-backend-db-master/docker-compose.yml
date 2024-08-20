@@ -48,7 +48,6 @@ services:
 
 networks:
   network-backend:
-    name: network-backend  # Nome explícito da rede
 
 volumes: 
   mongodb_data:
