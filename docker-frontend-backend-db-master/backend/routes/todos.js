@@ -3,9 +3,8 @@ const router = express.Router();
 const redis = require("redis");
 const Todo = require("../models/todo");
 
-// Conexão com o Redis
 const redisClient = redis.createClient({
-  host: 'redis',  // O nome do serviço Redis definido no Docker Compose
+  host: 'redis',
   port: 6379
 });
 
@@ -13,37 +12,41 @@ redisClient.on("error", (err) => {
   console.error("Redis error: ", err);
 });
 
-// Middleware para verificar se há cache
 const cacheMiddleware = (req, res, next) => {
   const cacheKey = "todos";
   redisClient.get(cacheKey, (err, data) => {
     if (err) throw err;
     if (data) {
-      res.send(JSON.parse(data));
+      return res.send(JSON.parse(data));
     } else {
       next();
     }
   });
 };
 
-// GET all todos com cache
 router.get("/", cacheMiddleware, async (req, res) => {
   const todos = await Todo.find({ is_complete: false });
-  // Armazenar no cache
-  redisClient.setex("todos", 3600, JSON.stringify(todos));  // 3600 segundos = 1 hora
+  redisClient.setex("todos", 3600, JSON.stringify(todos));  // Cache é armazenado
   res.send(todos);
 });
 
+// Operações que invalidam o cache
+const invalidateCache = () => {
+  redisClient.del("todos", (err, response) => {
+    if (err) {
+      console.error("Error deleting cache: ", err);
+    } else {
+      console.log("Cache invalidated");
+    }
+  });
+};
 
-// GET todo based on ID
 router.get("/:id", async (req, res) => {
   const todo = await Todo.findOne({ _id: req.params.id });
   res.send(todo);
 });
 
-// POST create new todo
 router.post("/", async (req, res) => {
-  console.log(req.body);
   const todo = new Todo({
     title: req.body.title,
     description: req.body.description,
@@ -51,27 +54,19 @@ router.post("/", async (req, res) => {
     due_date: req.body.due_date || new Date(),
   });
   await todo.save();
+  invalidateCache();  // Invalida o cache após criar um novo todo
   res.send(todo);
 });
 
-// UPDATE todo
 router.patch("/:id", async (req, res) => {
   try {
     const todo = await Todo.findOne({ _id: req.params.id });
-
-    if (req.body.title) {
-      todo.title = req.body.title;
-    }
-    if (req.body.description) {
-      todo.description = req.body.description;
-    }
-    if (req.body.is_complete) {
-      todo.is_complete = req.body.is_complete;
-    }
-    if (req.body.due_date) {
-      todo.due_date = req.body.due_date;
-    }
+    if (req.body.title) todo.title = req.body.title;
+    if (req.body.description) todo.description = req.body.description;
+    if (req.body.is_complete) todo.is_complete = req.body.is_complete;
+    if (req.body.due_date) todo.due_date = req.body.due_date;
     await todo.save();
+    invalidateCache();  // Invalida o cache após atualizar um todo
     res.send(todo);
   } catch {
     res.status(404);
@@ -79,10 +74,10 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-// DELETE todo
 router.delete("/:id", async (req, res) => {
   try {
     await Todo.deleteOne({ _id: req.params.id });
+    invalidateCache();  // Invalida o cache após deletar um todo
     res.status(204).send();
   } catch {
     res.status(404);
